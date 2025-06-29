@@ -1,0 +1,28 @@
+# LangGraph & LangChain Core
+langgraph
+langchain
+langchain-community
+
+# LLMs (Adjust depending on backend usage)
+openai
+# or for local LLMs:
+# llama-cpp-python
+# ctransformers
+
+# Data Management
+pydantic
+typing-extensions
+pandas
+
+# Optional: If you want to build a Streamlit UI
+streamlit
+
+# graphviz
+graphviz
+
+# Optional: For natural language tools, formatting, etc.
+# langdetect
+# tiktoken
+
+dotenv
+logging
