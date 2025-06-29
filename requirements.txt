@@ -19,7 +19,6 @@ streamlit
 
 # graphviz
 graphviz
-
 # Optional: For natural language tools, formatting, etc.
 # langdetect
 # tiktoken

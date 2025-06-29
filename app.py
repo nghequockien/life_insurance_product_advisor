@@ -1,78 +1,77 @@
 import streamlit as st
 import pandas as pd
+from utils.render_mermaid import render_mermaid
+
 from main_graph import build_graph
 from state import InsuranceAdvisorState
+from nodes.explanation_agent import stream_explanation
+from io import StringIO
 
-st.set_page_config(page_title="Product Advisor AI", layout="wide")
+# Set up page
+st.set_page_config("📊 Real-Time Product Advisor", layout="wide")
+st.title("🧠 Real-Time Product Advisor Dashboard")
 
-st.title("🧠 Product Advisor AI")
-st.markdown(
-    "Guide users through life insurance planning with a multi-agent LLM system."
-)
-
-# User input
+# Inputs
 with st.sidebar:
-    st.header("🔧 Inputs")
-    age = st.number_input("Age", value=35)
-    income = st.number_input("Annual Income (¥)", value=6000000)
-    goal = st.selectbox("Financial Goal", ["protection", "savings", "wealth building"])
-    dependents = st.slider("Dependents", 0, 5, 2)
-    run_clicked = st.button("🚀 Run Advisor")
+    st.header("User Profile")
+    age = st.number_input("Age", 30, 80, 35)
+    income = st.number_input("Income (¥)", 3000000, 20000000, 7000000)
+    goal = st.selectbox("Financial Goal", ["wealth building", "protection", "savings"])
+    dependents = st.slider("Dependents", 0, 4, 1)
+    show_graph = st.checkbox("🔍 Show LangGraph Diagram")
+    run = st.button("🚀 Run Advisor")
 
-# Initialize session state
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-if run_clicked:
-    state = InsuranceAdvisorState()
-    state["user_data"] = {
+if run:
+    st.subheader("🔁 Agent Timeline")
+    log_list = []
+    user_state = InsuranceAdvisorState()
+    user_state["user_data"] = {
         "age": age,
         "income": income,
         "goal": goal,
         "dependents": dependents,
     }
 
-    graph = build_graph()
-    final = graph.invoke(state)
+    graph = build_graph(log_list=log_list)
+    final_state = graph.invoke(user_state)
 
-    st.session_state.history.append(final)
+    for step in log_list:
+        with st.expander(
+            f"🔹 {step['agent']} — {step['time']} ({step['duration']:.2f}s)",
+            expanded=False,
+        ):
+            st.json(step["state"])
 
-    # Display Final Output
-    st.success(f"✅ Final Recommendation: {final['recommended_action']}")
+    # Final Output
+    st.subheader("✅ Final Recommendation")
+    st.success(final_state["recommended_action"])
 
-    # Quotes
-    if "quote_info" in final:
-        st.subheader("💸 Quotes")
+    if "quote_info" in final_state:
+        st.subheader("💰 Monthly Quotes")
         st.table(
             pd.DataFrame.from_dict(
-                final["quote_info"], orient="index", columns=["Monthly Premium"]
+                final_state["quote_info"], orient="index", columns=["Monthly Premium"]
             )
         )
 
-    # Explanation
-    if "explanation" in final:
-        st.subheader("🧾 Explanation")
-        st.markdown(final["explanation"])
-
-    # Comparison Table
-    if "comparisons" in final.get("user_data", {}):
+    if "comparisons" in final_state.get("user_data", {}):
         st.subheader("📊 Product Comparison")
-        df = pd.DataFrame(final["user_data"]["comparisons"])
-        st.dataframe(df)
+        st.dataframe(pd.DataFrame(final_state["user_data"]["comparisons"]))
 
-    # Simulation Data
-    if "simulations" in final.get("user_data", {}):
-        st.subheader("📈 Simulated Projection")
-        st.json(final["user_data"]["simulations"])
+    # Streamed LLM Explanation
+    st.subheader("💬 Product Explanation (LLM Streaming)")
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        message_box = StringIO()
 
-    # Raw State
-    with st.expander("🧪 Raw Graph State"):
-        st.json(final)
+        for chunk in stream_explanation(final_state["filtered_products"], goal):
+            message_box.write(chunk)
+            placeholder.markdown(message_box.getvalue())
 
-# Optional: View Past Runs
-if st.session_state.history:
-    with st.expander("📜 Past Runs"):
-        for i, hist in enumerate(reversed(st.session_state.history[-5:])):
-            st.markdown(
-                f"**Run {len(st.session_state.history) - i}** — {hist.get('recommended_action')}"
-            )
+# Mermaid Graph Visualization (optional)
+if show_graph:
+    compiled_graph = build_graph()
+    mermaid_code = compiled_graph.get_graph().draw_mermaid()
+
+    st.subheader("🕸️ LangGraph Visualization")
+    render_mermaid(mermaid_code)

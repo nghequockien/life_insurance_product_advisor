@@ -64,3 +64,32 @@ def explanation_agent(state: InsuranceAdvisorState) -> InsuranceAdvisorState:
         logging.error(f"LLM explanation_agent failed: {e}")
         state["explanation"] = "Sorry, I couldn't generate an explanation at this time."
     return state
+
+
+def stream_explanation(products: list, goal: str):
+    if not products:
+        yield "No products to explain."
+        return
+
+    prompt = (
+        f"You are a helpful insurance advisor. The user is interested in '{goal}'-oriented life insurance. "
+        f"Explain the following products:\n\n"
+    )
+    for product in products:
+        prompt += f"- {product}\n"
+    prompt += "\nUse clear, friendly language and bullet points where helpful."
+
+    stream = client.chat.completions.create(
+        model="gpt-4o-mini",
+        stream=True,
+        temperature=0.7,
+        max_tokens=500,
+        messages=[
+            {"role": "system", "content": "You are a knowledgeable insurance agent."},
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    for chunk in stream:
+        if chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
